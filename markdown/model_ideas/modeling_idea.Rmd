@@ -1,0 +1,112 @@
+---
+title: "Multidimensional Item Response Theory Models with SSL-IBP Prior"
+author: "Jiguang Li"
+date: "`r format(Sys.time(), '%y-%m-%d')`"
+
+output:
+  html_document:
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+params:
+  config_filepath: /Users/jiguangli/IBP_IRT/config/config.yaml
+---
+
+
+## Motivations
+
+In many educational testing settings, we don't really know what latent abilities are required for students to answer each individual item correctly. Rather than comparing students' average scores or using a single dimensional item response theory model, we want to come up with an interpretable multidimensional measures of students' latent ability from item response data. This could lead to more holistic measurement of students' abilities, more precise target remediation, and better education policy.
+
+Specifically, our model should be able to:
+
+- Determine the number of latent factors $K$ (e.g. geometry, algebra, language etc.) being tested in an exam (hence the IBP prior).
+- Select factor loading for each exam item (hence the SSL prior). 
+- Estimate students latent traits $\theta_i \in \mathbb R^{k}$ for each student.
+
+To demonstrate success of our model. Ideally, it should:
+
+- Step 1: work well in simulated data. 
+- Step 2: Yield higher data likelihood than baseline IRT model with real data (public data set available).
+- Step 3: Have a high prediction power of students future performance (data required)
+
+
+## Notations
+
+Let $i = 1, \cdots, N$ denote each individual student, $j= 1, \cdots, J$ denote each exam item, and assume there are total of $K$ latent traits we want to assess for each student $i$. In practice, we may not know the exact number of $K$.
+
+- $Y$: Binary $N \times J$ matrix representing student item response data. $Y_i \in \mathbb R^J$ is a binary response column vector for student $i$.  
+- $K^*$: truncated approximation level of $K$ in the IBP prior.
+- $\sigma(.)$: element-wise sigmoid function: $f(x) = \frac{1}{1+e^{-x}}$ 
+- $\theta_i \in \mathbb R^{K}$: student i 's latent trait. $\theta_{ik}$ represents student $i$'s ability in factor $k$.
+- $B \in \mathbb R^{J \times \infty }$: loading matrix. In IRT literature, this is frequently referred as the discrimination parameter.
+- $D \in \mathbb R^J$: intercepts. This is often referred as the difficulty parameter in IRT literature. (It may make more sense to let $D \in \mathbb R^{J\times \infty}$ because there should be different level of difficulties for each item and each factor, and the probability of student $i$ answering question $j$ correctly can be expressed as $\sigma(\sum_k (B_{jk}(\theta_{ik}- D_{jk})))$. But since this is not parameter of interest, we can simplify it as  $\sigma(\sum_k (B_{jk}(\theta_{ik}- D_{jk}))) = \sigma( B_j \cdot \theta_i - d_j)$, where $\cdot$ is the dot product, and $d_j = \sum_{k} B_{jk}D_{jk}$ is the intercept parameter).
+
+## Compensatory MIRT Model with SSL-IBP Prior
+
+Assume latent factors are uncorrelated and follow a multivariate Normal distribution:
+
+\begin{equation}
+\tag{3.1}
+\theta_i \sim N(0, I_{K*})
+\end{equation}
+
+For the intercept(difficulty) term $D \in \mathbb R^{J}$, we can assume the intercept for each item are independent:
+\begin{equation}
+\tag{3.2}
+D_j \stackrel{iid}{\sim} N(0,1)
+\end{equation}
+
+To set up the SSL-IRP prior on the factor loading matrix $B$. let IBP intensity parameter be $\alpha > 0$:
+
+\begin{equation}
+\tag{3.3}
+\nu_l \stackrel{iid}{\sim} \text{Beta}(\alpha, 1) \\
+c_k = \prod_{l=1}^{k} \nu_l \\
+\gamma_{jk}| c_k \sim \text{Bernoulli}(c_k)
+\end{equation}
+
+For the spike and slab LASSO prior, let $\lambda_{0k} >> \lambda_1 >0$, and denote $\psi(\beta | \lambda) = \frac{\lambda}{2}\exp \{-\lambda|\beta|\}$ as the Laplace prior with mean $0$ and variance $\frac{2}{\lambda^2}$. We have 
+
+\begin{equation}
+\tag{3.4}
+\pi(B_{jk} | \gamma_{jk}, \lambda_{0k}, \lambda_{1}) = (1-\gamma_{jk}) \psi(B_{jk} | \lambda_{0k}) + \gamma_{jl} \psi(B_{jk} | \lambda_1)
+\end{equation}
+
+In the IRT framework, we may write the data generating process as below:
+\begin{equation}
+\tag{3.5}
+Y_{i,j} | B_j, \theta_i, D_j \sim \text{Bernoulli}(\sigma(B_j \cdot \theta_i - D_j)) \\
+Y_i | B \sim \text{Bernoulli}(\sigma(B\theta_i - D))
+\end{equation}
+
+Alternatively, we can also assume $Y_i$'s are normally distributed (may also apply the sigmoid function in the very end). Specify the prior for the covariance matrix $\Sigma = \text{diag} \{\sigma_j^2\}_j^{J}$ for $Y_i$ such that $\sigma_j^2 \sim \text{InverseGamma}(0.5,0.5)$:
+\begin{equation}
+\tag{3.4}
+ Y_i \sim N(B\theta_i-D, \Sigma)
+\end{equation}
+
+
+## TODO
+
+1. Understand EM updates in the paper.
+2. Understand the existing code base (if available).
+3. Think what parts of EM algorithm need to be changed in order to estimate the model in Section 3.
+4. Test on simulated/real data.
+5. More variations: non-compensatory models, longitudinal data ... 
+
+
+
+
+
+
+
+
+
+
+
+

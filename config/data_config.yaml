@@ -1,0 +1,14 @@
+feather_data_dir: "/Users/jiguangli/Dropbox/ir_data_clean"
+output_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data"
+fake_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_data"
+model_output_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/model_outputs"
+
+
+year: "18"
+grade: "10"
+subject: "m"
+train_sample: 10000
+test_sample: 10000
+fake_data: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_10000_40_2_1.feather"
+fake_data2: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_10000_40_3_1.feather"
+fake_data3: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_10000_40_3_2.feather"

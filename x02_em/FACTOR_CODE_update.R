@@ -80,7 +80,7 @@ M_beta<-function(Y,Omega,P_star,M,sigma_k,lambda1,lambda0){
 
      K<-ncol(Omega)
      G<-ncol(Y)
- 	 n<-nrow(Y)
+ 	   n<-nrow(Y)
      beta<-matrix(0,G,K)	      	     	
      Ystar<-rbind(Y,matrix(0,K,G))
      L<-t(chol(M))
@@ -127,9 +127,9 @@ M_beta2<-function(Y,Omega,P_star,M,sigma_k,lambda1,lambda0){
      L<-t(chol(M))
    
      Xstar<-rbind(Omega,sqrt(n)*L)
-	 ch<-chol(1/n*t(Xstar)%*%Xstar)
-	 Astar<-solve(ch)
-	 XXstar<-Xstar%*%Astar
+	   ch<-chol(1/n*t(Xstar)%*%Xstar)
+	   Astar<-solve(ch)
+	   XXstar<-Xstar%*%Astar
 	 
 
 

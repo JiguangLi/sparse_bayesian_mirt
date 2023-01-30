@@ -1,0 +1,63 @@
+# Bayesian MIRT
+
+This package is for the Bayesian MIRT model. Currently under development.
+
+
+# Installation
+
+While developing:
+
+```python
+pip install -e .
+```
+
+
+# Usage
+
+```python
+import bayesian_mirt as bmirt
+```
+
+# Inference
+
+
+# References
+
+
+# Contributing
+
+We recommend working in a virtual environment for package development. Use [`direnv`](https://direnv.net/) to 
+automatically activate your virtual environment.
+
+```bash
+# set up virtual environment, install required packages, and install bayesian_mirt
+python -m pip install --upgrade pip virtualenv
+python -m virtualenv --prompt="(bmirt) " .venv
+
+# use direnv to activate the virtual environment whenever you are in the working directory
+echo "source .venv/bin.activate > .envrc"
+direnv allow
+
+# install packages into new (activated) virtual environment
+pip install -r requirements.txt
+pip install -e .
+```
+
+All tests should be completed within the virtual environment, to ensure consistency. We test with tox, so any version of
+Python3.6+ should work fine.
+
+
+### Tetsing 
+
+After making changes, apply the package formatting rules and check that the package still passes the tests. This is 
+achieved easily with the help of our Makefile.
+
+```bash
+make help  # check allowable make commands for more information
+make format
+make test
+tox  # check that package passes tests on all tox versions
+```
+
+That's it! We would love your contributions or suggestions.
+
