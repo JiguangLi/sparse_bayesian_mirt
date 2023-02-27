@@ -49,7 +49,7 @@ def mirt_parameters(n: int, m: int, k: int, theta_sigma: float, alpha_sigma: flo
 
 def ss_mirt_parameters(
     n: int, m: int, k: int, zeros_per_dim: int = 0, theta_sigma: float = 1.0, alpha_sigma: float = 1.0,
-        compensatory_flag: bool=True
+        compensatory_flag: bool= True, lower_triangularize = False
 ) -> typing.Dict[str, typing.Any]:
     """Generate paraemters for an SS mIRT model.
 
@@ -88,6 +88,25 @@ def ss_mirt_parameters(
         intercepts = np.random.normal(loc=0, scale=1.5, size=(1, m))
     else:
         intercepts= np.random.normal(loc=0, scale=1.5, size=(k, m))
+    if lower_triangularize:
+        alphas = np.tril(alphas.T)
+        np.fill_diagonal(alphas, 1)
+        alphas = alphas.T
+
     true_params = {"alphas": alphas, "thetas": thetas, "intercepts": intercepts, "boolean_mask": boolean_mask,
                    "compensatory_flag": compensatory_flag}
     return true_params
+
+def lower_trig_constraints(num_items:int, dim:int) -> typing.Dict[typing.Tuple[int, int], float]:
+    """Return a dictionary where the entries of main diagonal is  1, and all the upper triangular part 0
+
+    Note we assume num_items >= factor dimension dim
+    """
+    result = {}
+    for i in range(dim):
+        result[(i, i)] = 1
+    for i in range(dim):
+        for j in range(num_items):
+            if i > j:
+                result[(j, i)] = 0
+    return result

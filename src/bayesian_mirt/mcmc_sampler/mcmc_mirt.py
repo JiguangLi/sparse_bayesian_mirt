@@ -5,7 +5,7 @@ import pandas as pd
 from polyagamma import random_polyagamma
 from tqdm import tqdm
 from scipy.stats import norm
-np.random.seed(0)
+np.random.seed(42)
 class MCMC_MIRT:
     def __init__(
             self,
@@ -29,14 +29,15 @@ class MCMC_MIRT:
             Raises:
                 ValueError: if given inputs do not meet object expectations.
         """
+        np.random.seed(42)
         if isinstance(data, pd.DataFrame):
             self.data = data.values
         elif isinstance(data, np.ndarray):
             self.data = data
         else:
             raise ValueError(f"Input data has unrecognised type {type(data)}, try a numpy.array instead.")
-        if alpha_prior not in ["normal", "ss"]:
-            raise ValueError("Invalid prior for alpha - 'normal' or 'ss'")
+        if alpha_prior not in ["normal", "ss", "adaptive-ss"]:
+            raise ValueError("Invalid prior for alpha - 'normal' or 'ss', or 'adaptive-ss'")
 
         self.n = self.data.shape[0]
         self.m = self.data.shape[1]
@@ -45,9 +46,17 @@ class MCMC_MIRT:
         self.n_s = num_samples
         self.params = {}
         self.loading_constraints = loading_constraints
+        self.num_constraints = len(loading_constraints)
+        if len(loading_constraints) > 0:
+            self.num_zero_constraints = sum([val == 0 for val in loading_constraints.values()])
+            self.num_nonzero_constraints = len(loading_constraints) - self.num_zero_constraints
+        else:
+            self.num_zero_constraints, self.num_nonzero_constraints = 0, 0
         if self.alpha_prior == "ss":
-            self.ss_prior_prob = 0.5
-            self.spike_var, self.slab_var = 0.01, 1
+            self.spike_var, self.slab_var = 0.005, 1
+        elif self.alpha_prior == "adaptive-ss":
+            self.v0 = 0.005
+            self.ig1, self.ig2 = 10, 9
 
     def initialize_thetas(self):
         """Initialize Theta Params"""
@@ -69,13 +78,16 @@ class MCMC_MIRT:
 
     def initialize_ss_alphas(self):
         """Initialize Alpha(loading) Params with spike-and-slab Prior"""
+        ## TODO: do we assume alphas are all from slab distribution first (currently no)? Does it matter?
         self.params["alphas"] = np.zeros((self.n_s + 1, self.m, self.k), dtype=float)
         alpha_mu = np.zeros(self.k)
         alpha_cov_spike, alpha_cov_slab = np.identity(self.k)*self.spike_var, np.identity(self.k)*self.slab_var
         alphas_spike = np.random.multivariate_normal(alpha_mu, alpha_cov_spike, size=self.m)
         alphas_slab = np.random.multivariate_normal(alpha_mu, alpha_cov_slab, size=self.m)
+        self.params["ss_thetas"] = np.zeros(self.n_s + 1, dtype=float)
+        self.params["ss_thetas"][0] = np.random.uniform(0, 1)
         self.params["ss"] = np.zeros((self.n_s + 1, self.m, self.k), dtype=int)
-        self.params["ss"][0] = np.random.binomial(1, self.ss_prior_prob, size=(self.m, self.k))
+        self.params["ss"][0] = np.random.binomial(1, self.params["ss_thetas"][0], size=(self.m, self.k))
         self.params["alphas"][0] = self.params["ss"][0] * alphas_slab + (1-self.params["ss"][0])*alphas_spike
         for pos, val in self.loading_constraints.items():
             j_entry, k_entry = pos
@@ -86,6 +98,26 @@ class MCMC_MIRT:
                 self.params["ss"][:, j_entry, k_entry] = 1
         self.params["alphas_holder"] = np.copy(self.params["alphas"][0])
 
+    def initialize_adapt_ss_alphas(self):
+        """Initialize Alpha(loading) Params with spike-and-slab Prior - variance adaptive"""
+        self.params["ss_thetas"] = np.zeros(self.n_s + 1, dtype=float)
+        self.params["ss_thetas"][0] = np.random.uniform(0, 1)
+        self.params["tau_var"] = np.zeros((self.n_s + 1, self.m, self.k), dtype=float)
+        self.params["tau_var"][0] = 1/np.random.gamma(self.ig1, 1/self.ig2, (self.m, self.k))
+        self.params["adapt_ss"] = np.zeros((self.n_s + 1, self.m, self.k), dtype=float)
+        binomial_mat = np.random.binomial(1, self.params["ss_thetas"][0], size=(self.m, self.k))
+        self.params["adapt_ss"][0] = binomial_mat + (1-binomial_mat)*self.v0
+        self.params["alphas"] = np.zeros((self.n_s + 1, self.m, self.k), dtype=float)
+        self.params["alphas"][0] = np.random.normal(0, self.params["adapt_ss"][0] * self.params["tau_var"][0])
+        for pos, val in self.loading_constraints.items():
+            j_entry, k_entry = pos
+            self.params["alphas"][:, j_entry, k_entry] = val
+            if val == 0:
+                self.params["adapt_ss"][:, j_entry, k_entry] = self.v0
+            else:
+                self.params["adapt_ss"][:, j_entry, k_entry] = 1
+        self.params["alphas_holder"] = np.copy(self.params["alphas"][0])
+
     def initialize_intercepts(self):
         """Initialize Intercept Params"""
         self.params["intercepts"] = np.zeros((self.n_s + 1, self.m, 1), dtype=float)
@@ -93,7 +125,6 @@ class MCMC_MIRT:
 
     def initialize_pg(self):
         """Initialize Polya-Gamma Variables w_{ij} for Data Augmentation"""
-        ## TODO: update Polya-Gamma: think whether we need to keep all PG sample
         self.params["pg"] = np.zeros((self.n_s + 1, self.n, self.m), dtype=float)
         self.params["pg"][0] = random_polyagamma(1, 0, size=(self.n, self.m))
         self.update_pg_zmat(self.params["pg"][0])
@@ -105,12 +136,14 @@ class MCMC_MIRT:
     def initialize(self) -> None:
         """Initalize All Parameters If We want to Run Full-scale MCMC"""
         self.initialize_thetas()
-        self.initialize_intercepts()
+        self.initialize_pg()
         if self.alpha_prior == "normal":
             self.initialize_alphas()
         elif self.alpha_prior == "ss":
             self.initialize_ss_alphas()
-        self.initialize_pg()
+        elif self.alpha_prior == "adaptive-ss":
+            self.initialize_adapt_ss_alphas()
+        self.initialize_intercepts()
 
     def sample_pg(self, draw_idx: int, pred_mat: np.ndarray) -> None:
         """Sample polya-gamma variables"""
@@ -182,6 +215,7 @@ class MCMC_MIRT:
 
             Note: We assume the program sample intercepts before sampling alphas.
         """
+        ##TODO: ss_theta is currently conditional on unconstrained loadings
         for j in range(self.m):
             for k in range(self.k):
                 if (j, k) not in self.loading_constraints:
@@ -201,8 +235,51 @@ class MCMC_MIRT:
                     new_draw = np.random.normal(pos_mu, pos_var)
                     self.params["alphas"][draw_idx][j, k] = new_draw
                     self.params["alphas_holder"][j, k] = new_draw
-                    ss_prob = self.compute_ss_prob(new_draw)
+                    ss_prob = self.compute_ss_prob(draw_idx, new_draw)
                     self.params["ss"][draw_idx][j, k] = np.random.binomial(1, ss_prob)
+        beta_arg1 = np.sum(self.params["ss"][draw_idx]) + 1 - self.num_nonzero_constraints
+        beta_arg2 = self.m * self.k - self.num_constraints - beta_arg1 + 2
+        self.params["ss_thetas"][draw_idx] = np.random.beta(beta_arg1, beta_arg2)
+
+    def sample_adapt_ss_alphas(self, draw_idx: int, thetas: np.ndarray):
+        """Gibb Sampling Loading Matrix Alphas (with adaptive spike-and-slab prior)
+               Args:
+                   thetas: N by K latent traits
+
+               Note: We assume the program sample intercepts before sampling alphas.
+           """
+        for j in range(self.m):
+            for k in range(self.k):
+                if (j, k) not in self.loading_constraints:
+                    # sample alphas
+                    boolean_slicer = np.array([True]*self.k)
+                    boolean_slicer[k] = False
+                    v_inner_prod = np.matmul(thetas[:, boolean_slicer],
+                                             self.params["alphas_holder"][j, boolean_slicer].reshape(-1, 1)).flatten()
+                    v = self.params["z_mat"][:, j] - v_inner_prod - np.ones(self.n) * self.params["intercepts"][draw_idx][j][0]
+                    theta_k = thetas[:, k]
+                    mu_s = v/theta_k
+                    var_s = (1/self.params["pg"][draw_idx][:, j])*(1/np.square(theta_k))
+                    lik_mu, lik_var = self.compute_gaussian_kernel(mu_s, var_s)
+                    prior_var = self.params["adapt_ss"][draw_idx-1][j,k] * self.params["tau_var"][draw_idx-1][j,k]
+                    pos_mu = lik_mu*prior_var/(lik_var + prior_var)
+                    pos_var = lik_var*prior_var/(lik_var + prior_var)
+                    new_draw = np.random.normal(pos_mu, pos_var)
+                    self.params["alphas"][draw_idx][j, k] = new_draw
+                    self.params["alphas_holder"][j, k] = new_draw
+                    # sample adapt_ss
+                    adapt_ss_prob = self.compute_adapt_ss_prob(draw_idx, new_draw,
+                                                               self.params["tau_var"][draw_idx-1][j,k])
+                    bernoulli_draw = np.random.binomial(1, adapt_ss_prob)
+                    self.params["adapt_ss"][draw_idx][j, k] = bernoulli_draw + (1-bernoulli_draw)*self.v0
+                    # sample tau_var
+                    gamma_arg1 = self.ig1 + 0.5
+                    gamma_arg2 = self.ig2 + new_draw**2/(2*self.params["adapt_ss"][draw_idx][j, k])
+                    self.params["tau_var"][draw_idx][j, k] = 1 / np.random.gamma(gamma_arg1, 1 / gamma_arg2)
+
+        beta_arg1 = np.sum(self.params["adapt_ss"][draw_idx] == 1) + 1 - self.num_nonzero_constraints
+        beta_arg2 = self.m * self.k - self.num_constraints - beta_arg1 + 2
+        self.params["ss_thetas"][draw_idx] = np.random.beta(beta_arg1, beta_arg2)
 
     def fit(self):
         """Fit a Full-Scaled MCMC Model"""
@@ -218,6 +295,8 @@ class MCMC_MIRT:
                 self.sample_alphas(i, self.params["thetas"][i])
             elif self.alpha_prior == "ss":
                 self.sample_ss_alphas(i, self.params["thetas"][i])
+            elif self.alpha_prior == "adaptive-ss":
+                self.sample_adapt_ss_alphas(i, self.params["thetas"][i])
 
     def estimate_thetas(self,
                        fixed_alphas: np.ndarray,
@@ -249,6 +328,8 @@ class MCMC_MIRT:
             self.initialize_alphas()
         elif self.alpha_prior == "ss":
             self.initialize_ss_alphas()
+        elif self.alpha_prior == "adaptive-ss":
+            self.initialize_adapt_ss_alphas()
         else:
             raise NotImplementedError("alpha prior type unimplemented")
         self.initialize_intercepts()
@@ -261,6 +342,8 @@ class MCMC_MIRT:
                 self.sample_alphas(i, fixed_thetas)
             elif self.alpha_prior == "ss":
                 self.sample_ss_alphas(i, fixed_thetas)
+            elif self.alpha_prior == "adaptive-ss":
+                self.sample_adapt_ss_alphas(i, fixed_thetas)
 
     def predict(self,
                 burn_nums: int,
@@ -324,17 +407,48 @@ class MCMC_MIRT:
         return pos_mean
 
     def ss(self, burn_nums: int):
-        """Posterior for spike-slab-normal Variable Selection Variable"""
+        """Posterior Mean for spike-slab-normal Variable Selection Variable"""
         if "ss" not in self.params:
-            raise ValueError("No ss  parameter available: model hasn't been fit ")
+            raise ValueError("No ss parameter available: model hasn't been fit ")
         pos_mean = np.mean(self.params["ss"][burn_nums + 1:], axis=0)
         return pos_mean
 
-    def compute_ss_prob(self, alpha_draw):
+    def ss_thetas(self, burn_nums: int):
+        """Posterior Mean for ss_thetas (hierarchical uniform prior for ss) """
+        if "ss_thetas" not in self.params:
+            raise ValueError("No ss_thetas parameter available: model hasn't been fit ")
+        pos_mean = np.mean(self.params["ss_thetas"][burn_nums + 1:], axis=0)
+        return pos_mean
+
+    def adapt_ss(self, burn_nums: int):
+        """Posterior Mean for spike-slab-normal Variable Selection Variable"""
+        if "adapt_ss" not in self.params:
+            raise ValueError("No ss parameter available: model hasn't been fit ")
+        pos_mean = np.mean(self.params["adapt_ss"][burn_nums + 1:], axis=0)
+        total_num = self.params["adapt_ss"][burn_nums + 1:].size
+        pos_1_percentage = np.sum(self.params["adapt_ss"][burn_nums + 1:] == 1)/total_num
+        return pos_mean, pos_1_percentage
+
+    def tau_var(self, burn_nums:int):
+        """Posterior Mean for tau_var (for adaptive-ss alpha prior only)"""
+        if "tau_var" not in self.params:
+            raise ValueError("No ss parameter available: model hasn't been fit ")
+        pos_mean = np.mean(self.params["tau_var"][burn_nums + 1:], axis=0)
+        return pos_mean
+
+    def compute_ss_prob(self, draw_idx: int, alpha_draw: float):
         """Compute P(ss_variable=1 | alpha_{jk})"""
-        p_alpha1 = norm.pdf(alpha_draw, 0, self.slab_var**0.5) * self.ss_prior_prob
-        p_alpha0 = norm.pdf(alpha_draw, 0, self.spike_var**0.5) * (1-self.ss_prior_prob)
+        theta_prev = self.params["ss_thetas"][draw_idx-1]
+        p_alpha1 = norm.pdf(alpha_draw, 0, self.slab_var**0.5) * theta_prev
+        p_alpha0 = norm.pdf(alpha_draw, 0, self.spike_var**0.5) * (1-theta_prev)
         return p_alpha1/(p_alpha1 + p_alpha0)
+
+    def compute_adapt_ss_prob(self, draw_idx: int, alpha_draw: float, tau_var: float):
+        """Compute P(adapt_ss_variable=1 | alpha_{jk})"""
+        theta_prev = self.params["ss_thetas"][draw_idx - 1]
+        p_alpha1 = norm.pdf(alpha_draw, 0,   tau_var ** 0.5) * theta_prev
+        p_alpha0 = norm.pdf(alpha_draw, 0, (tau_var * self.v0) ** 0.5) * (1 - theta_prev)
+        return p_alpha1 / (p_alpha1 + p_alpha0)
 
     @staticmethod
     def compute_gaussian_kernel(mu_s: np.array, var_s: np.array) -> typing.Tuple[float, float]:

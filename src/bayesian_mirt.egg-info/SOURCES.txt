@@ -5,6 +5,8 @@ src/bayesian_mirt.egg-info/SOURCES.txt
 src/bayesian_mirt.egg-info/dependency_links.txt
 src/bayesian_mirt.egg-info/requires.txt
 src/bayesian_mirt.egg-info/top_level.txt
+src/bayesian_mirt/mcmc_sampler/__init__.py
+src/bayesian_mirt/mcmc_sampler/mcmc_mirt.py
 src/bayesian_mirt/util/__init__.py
 src/bayesian_mirt/util/generate.py
 src/bayesian_mirt/util/response.py
