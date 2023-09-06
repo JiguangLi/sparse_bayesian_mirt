@@ -1,9 +1,12 @@
+project_data_dir: "/Users/jiguangli/IBP_IRT/data"
+dese_data_dir: "/Users/jiguangli/IBP_IRT/DESE_data"
 feather_data_dir: "/Users/jiguangli/Dropbox/ir_data_clean"
-output_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data"
+output_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/first_experiment"
 fake_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_data"
-model_output_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/model_outputs"
-
-
+real_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/real_data"
+probit_fake_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/probit_fake_data"
+probit_overlap_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/probit_overlap_data"
+mcmc_em_data_dir: "/Users/jiguangli/Dropbox/irt_ibp_data/mcmc_vs_em_data"
 year: "18"
 grade: "10"
 subject: "m"
@@ -12,3 +15,4 @@ test_sample: 10000
 fake_data: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_10000_40_2_1.feather"
 fake_data2: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_10000_40_3_1.feather"
 fake_data3: "/Users/jiguangli/Dropbox/irt_ibp_data/fake_10000_40_3_2.feather"
+

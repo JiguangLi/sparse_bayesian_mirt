@@ -4,7 +4,9 @@ from numpy.linalg import inv
 import pandas as pd
 from tqdm import tqdm
 from .minimax_tilting import TruncatedMVN
+from .probit_opt_problems import ProbitOptimizationProblem
 import cvxpy as cp
+import multiprocessing
 
 
 class EMProbitMIRT:
@@ -18,6 +20,7 @@ class EMProbitMIRT:
             ssl_lambdas: typing.Tuple[float, float] = (50, 1),
             max_iterations: int = 1000,
             epsilon: float = 1e-4,
+            num_workers: int = 6,
             loading_constraints: typing.Optional[typing.Dict[typing.Tuple[int, int], float]] = None,
             start: typing.Optional[typing.Dict[str, np.ndarray]] = None,
             random_state: int = 42,
@@ -60,6 +63,17 @@ class EMProbitMIRT:
         self.loading_constraints = loading_constraints
         self.start = start
         self.random_state = random_state
+        self.num_workers = num_workers
+        self.constraint_mat = np.zeros((self.m, self.k))
+        self.update_constraint_mat()
+        self.constraint_boolean_mask = (self.constraint_mat == 0).astype(int)
+        self.initialize_parameters()
+
+    def update_constraint_mat(self):
+        """Update an m by k Loading constraint Matrix"""
+        for pos, val in self.loading_constraints.items():
+            j_entry, k_entry = pos
+            self.constraint_mat[j_entry, k_entry] = val
 
     def initialize_thetas(self):
         """Initialize Latent Traits/Factors"""
@@ -67,7 +81,8 @@ class EMProbitMIRT:
             if "thetas" in self.start:
                 self.params["thetas"] = self.start["thetas"]
         else:
-            self.params["thetas"] = np.zeros((self.n, self.num_samples, self.k), dtype=float)
+            self.params["thetas"] = self.rng.multivariate_normal(np.zeros(self.k), np.identity(self.k),
+                                                                 size=(self.n, self.num_samples))
 
     def initialize_alphas(self):
         """Initialize Factor Loadings"""
@@ -91,7 +106,7 @@ class EMProbitMIRT:
         self.params["c_params"] = c_s
         self.params["gammas"] = np.zeros((self.m, self.k))
         for i in range(self.k):
-            self.params["gammas"][:, i] = self.rng.binomial(1, c_s[i], 40)
+            self.params["gammas"][:, i] = self.rng.binomial(1, c_s[i], self.m)
         if self.start:
             if "c_params" in self.start:
                 self.params["c_params"] = self.start["c_params"]
@@ -115,6 +130,16 @@ class EMProbitMIRT:
         self.initialize_gammas_and_cs()
         self.initialize_intercepts()
 
+    def sample_unified_skewed_normal(self, d1i, s_array, d2_array):
+        cov_v0 = np.identity(self.k) - d1i.T @ (inv(d1i @ d1i.T + np.identity(self.m))) @ d1i
+        cov_v1 = np.diag(1 / s_array) @ (d1i @ d1i.T + np.identity(self.m)) @ np.diag(1 / s_array)
+        truc_lev = - np.diag(1 / s_array) @ (d2_array.reshape(-1, 1)).flatten()
+        v0_s = self.rng.multivariate_normal(np.zeros(self.k), cov_v0, self.num_samples)
+        v1_s = TruncatedMVN(np.zeros(self.m), cov_v1, truc_lev,
+                            np.ones_like(truc_lev) * np.inf, seed=self.random_state).sample(self.num_samples)
+        linear_t = d1i.T @ (inv(d1i @ d1i.T + np.identity(self.m))) @ np.diag(s_array)
+        return v0_s + (linear_t @ v1_s).T
+
     def sample_thetas(self):
         """Sample from the Posterior Distribution of Thetas for all i's
         The function starts by creating the following variables
@@ -125,16 +150,21 @@ class EMProbitMIRT:
         d1_tensor = self.params["alphas"][:, :, None] * (2*self.data-1).T[:, None, :]
         d2_array = (2*self.data-1)*self.params["intercepts"].reshape(1, -1)
         s_array = np.transpose(np.sqrt(np.sum(np.square(d1_tensor), axis=1)+1))
+        arguments = [(d1_tensor[:, :, i], s_array[i], d2_array[i]) for i in range(self.n)]
+        with multiprocessing.Pool(self.num_workers) as pool:
+            out = pool.starmap(self.sample_unified_skewed_normal, arguments)
         for i in range(self.n):
-            d1i = d1_tensor[:, :, i]
-            cov_v0 = np.identity(self.k) - d1i.T@(inv(d1i@d1i.T+np.identity(self.m)))@d1i
-            cov_v1 = np.diag(1/s_array[i])@(d1i@d1i.T+np.identity(self.m))@np.diag(1/s_array[i])
-            truc_lev = - np.diag(1/s_array[i])@(d2_array[i].reshape(-1, 1)).flatten()
-            v0_s = self.rng.multivariate_normal(np.zeros(self.k), cov_v0, self.num_samples)
-            v1_s = TruncatedMVN(np.zeros(self.m), cov_v1, truc_lev,
-                                np.ones_like(truc_lev) * np.inf, seed=self.random_state).sample(self.num_samples)
-            linear_t = d1i.T@(inv(d1i@d1i.T + np.identity(self.m)))@np.diag(s_array[i])
-            self.params["thetas"][i] = v0_s + (linear_t @ v1_s).T
+            self.params["thetas"][i] = out[i]
+        # for i in range(self.n):
+        #     d1i = d1_tensor[:, :, i]
+        #     cov_v0 = np.identity(self.k) - d1i.T@(inv(d1i@d1i.T+np.identity(self.m)))@d1i
+        #     cov_v1 = np.diag(1/s_array[i])@(d1i@d1i.T+np.identity(self.m))@np.diag(1/s_array[i])
+        #     truc_lev = - np.diag(1/s_array[i])@(d2_array[i].reshape(-1, 1)).flatten()
+        #     v0_s = self.rng.multivariate_normal(np.zeros(self.k), cov_v0, self.num_samples)
+        #     v1_s = TruncatedMVN(np.zeros(self.m), cov_v1, truc_lev,
+        #                         np.ones_like(truc_lev) * np.inf, seed=self.random_state).sample(self.num_samples)
+        #     linear_t = d1i.T@(inv(d1i@d1i.T + np.identity(self.m)))@np.diag(s_array[i])
+        #     self.params["thetas"][i] = v0_s + (linear_t @ v1_s).T
 
     def update_gammas(self):
         """Update Gamma Variables for Variable Selection"""
@@ -159,33 +189,55 @@ class EMProbitMIRT:
             result = item_idx in items
             return result
 
+    def construct_opt_arguments(self, l1_penalty):
+        """Construct Optimization Arguments for Multiprocessing"""
+        result = [(np.repeat(self.data[:, j], self.num_samples).reshape(-1, 1),
+                   l1_penalty[j, :].reshape(-1, 1),
+                   self.constraint_mat[j, :].reshape(-1, 1),
+                   self.constraint_boolean_mask[j, :].reshape(-1, 1)
+                   ) for j in range(self.m)]
+        return result
+
     def optimize_loadings(self):
         """Maximizing Loglikelihood and Penalty Terms to Obtain Factor Loadings and Intercepts"""
         thetas = self.params["thetas"].reshape(self.n*self.num_samples, -1)
         l1_penalty = self.params["gammas"] * self.lambda1 + (1-self.params["gammas"]) * self.lambda0
+        problem = ProbitOptimizationProblem(self.data, thetas, l1_penalty, self.num_samples, self.k,
+                                            self.loading_constraints)
+        pool = multiprocessing.Pool(self.num_workers)
+        out = pool.map(problem.solve_sub_problem, range(0, self.m))
         for j in range(self.m):
-            alpha_j = cp.Variable((self.k, 1))
-            d_j = cp.Variable((1, 1))
-            y_j = np.repeat(self.data[:, j], self.num_samples).reshape(-1, 1)
-            log_likelihood = cp.sum(cp.multiply(y_j, cp.log_normcdf(thetas@alpha_j+d_j)) +
-                                    cp.multiply(1 - y_j, cp.log_normcdf(-(thetas@alpha_j + d_j))))
-            penal_term = cp.norm(cp.multiply(alpha_j, l1_penalty[j, :].reshape(-1, 1)), 1)
-            if self.constrain_loadings(j):
-                constraints = []
-                for pos, val in self.loading_constraints.items():
-                    if pos[0] == j:
-                        constraints += [alpha_j[pos[1]] == val]
-                problem = cp.Problem(
-                    cp.Maximize(log_likelihood / self.num_samples - penal_term - 0.5 * cp.square(cp.norm(d_j, 2))),
-                    constraints
-                )
-            else:
-                problem = cp.Problem(
-                    cp.Maximize(log_likelihood/self.num_samples - penal_term - 0.5 * cp.square(cp.norm(d_j, 2)))
-                )
-            problem.solve()
-            self.params["alphas"][j, :] = alpha_j.value.flatten()
-            self.params["intercepts"][j] = d_j.value[0][0]
+            self.params["alphas"][j, :] = out[j][0]
+            self.params["intercepts"][j] = out[j][1]
+
+
+    # def optimize_loadings(self):
+    #     """Maximizing Loglikelihood and Penalty Terms to Obtain Factor Loadings and Intercepts"""
+    #     thetas = self.params["thetas"].reshape(self.n*self.num_samples, -1)
+    #     l1_penalty = self.params["gammas"] * self.lambda1 + (1-self.params["gammas"]) * self.lambda0
+    #     for j in range(self.m):
+    #         alpha_j = cp.Variable((self.k, 1))
+    #         d_j = cp.Variable((1, 1))
+    #         y_j = np.repeat(self.data[:, j], self.num_samples).reshape(-1, 1)
+    #         log_likelihood = cp.sum(cp.multiply(y_j, cp.log_normcdf(thetas@alpha_j+d_j)) +
+    #                                 cp.multiply(1 - y_j, cp.log_normcdf(-(thetas@alpha_j + d_j))))
+    #         penal_term = cp.norm(cp.multiply(alpha_j, l1_penalty[j, :].reshape(-1, 1)), 1)
+    #         if self.constrain_loadings(j):
+    #             constraints = []
+    #             for pos, val in self.loading_constraints.items():
+    #                 if pos[0] == j:
+    #                     constraints += [alpha_j[pos[1]] == val]
+    #             problem = cp.Problem(
+    #                 cp.Maximize(log_likelihood / self.num_samples - penal_term - 0.5 * cp.square(cp.norm(d_j, 2))),
+    #                 constraints
+    #             )
+    #         else:
+    #             problem = cp.Problem(
+    #                 cp.Maximize(log_likelihood/self.num_samples - penal_term - 0.5 * cp.square(cp.norm(d_j, 2)))
+    #             )
+    #         problem.solve()
+    #         self.params["alphas"][j, :] = alpha_j.value.flatten()
+    #         self.params["intercepts"][j] = d_j.value[0][0]
 
     def optimize_c_params(self):
         """MAP for C-params, the Probabilities of Inclusion"""
@@ -213,14 +265,13 @@ class EMProbitMIRT:
 
     def fit(self):
         """Fit a Probit EM Algorithm"""
-        self.initialize_parameters()
         for i in tqdm(range(self.max_iterations)):
             self.e_step()
             self.m_step()
             max_diff = max(np.max(np.abs((self.params["alphas"] - self.params["alphas_prev"]))),
                            np.max(np.abs((self.params["intercepts"] - self.params["intercepts_prev"]))))
+            print(max_diff)
             if max_diff < self.epsilon:
                 break
-            print(max_diff)
             self.params["alphas_prev"] = np.copy(self.params["alphas"])
             self.params["intercepts_prev"] = np.copy(self.params["intercepts"])
