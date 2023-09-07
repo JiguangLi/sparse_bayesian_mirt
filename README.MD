@@ -1,4 +1,22 @@
-# Bayesian MIRT
+# Sparse Bayesian Multidimensional Item Response Theory
+
+This repo contains the R implementation of the PXL-EM algorithm to estimate sparse factor loadings from binary item response data, as illustrated in our paper *Sparse Bayesian Multidimensional Item Response Theory*. While we advocate for the Bayesian EM approach, we also publicize our Python implementation of sparse Gibbs sampler with adaptive spike-and-slab prior for interested researchers.
+
+# Repo Directions
+
+# PXL-EM Usage Examples & Advice
+
+# Sparse Gibbs Sampler Usage Examples & Advice
+
+# Experiment Replications
+
+## IBP Experiment
+
+## DESE Experiment
+
+## QOL Experiment
+
+
 
 This package is for the Bayesian MIRT model. Currently under development.
 
