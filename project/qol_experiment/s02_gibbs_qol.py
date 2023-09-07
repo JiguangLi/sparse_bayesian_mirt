@@ -11,7 +11,7 @@ import pickle
 def parse_args(verbose: bool = False) -> typing.Dict[str, typing.Any]:
     """Get command line arguments, with defaults set for local testing."""
     # parse command line arguments first
-    parser = argparse.ArgumentParser("Fit Gibbs Samplers on DESE data, 2022 grade 10")
+    parser = argparse.ArgumentParser("Fit Gibbs Samplers on QOL dataset")
     parser.add_argument("--config_filepath",
                         default= pathlib.Path.home().joinpath(pathlib.Path("IBP_IRT", "config", "data_config.yaml")))
     parser.add_argument("--verbose", default=True)

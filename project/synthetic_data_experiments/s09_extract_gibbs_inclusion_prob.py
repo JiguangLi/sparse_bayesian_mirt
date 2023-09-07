@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import pathlib
 import yaml
-import bayesian_mirt as bmirt
 import argparse
 import typing
 import pickle
@@ -24,6 +23,7 @@ def parse_args(verbose: bool = False) -> typing.Dict[str, typing.Any]:
     if verbose:
         print(arguments)
     return arguments
+
 
 def read_small_thetas(small_model_output_dir, burn_in):
     with open(small_model_output_dir.joinpath("gibbs_large_k.pkl"), 'rb') as handle:
@@ -53,9 +53,6 @@ def read_ibp_thetas(ibp_model_output_dir, burn_in):
     with open(ibp_model_output_dir.joinpath("gibbs_trig_true_k.pkl"), 'rb') as handle:
         model = pickle.load(handle)
         thetas_ibp.append(model.ss_thetas(burn_in))
-
-
-
 
 
 if __name__ == "__main__":

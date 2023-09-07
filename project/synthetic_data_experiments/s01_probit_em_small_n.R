@@ -37,7 +37,7 @@ saveRDS(small_data_probit, file.path(arguments[["data_output_dir"]], "small_n_pr
 write_feather(as.data.frame(small_data_logit), file.path(arguments[["data_output_dir"]], "small_n_logit.feather"))
 
 
-# Initialize Loading for EM algorithms
+# Initialize Loadings
 large_k <- 10
 nitems <- nrow(small_data_probit$alphas)
 loading_starts_large <- hash("alphas"= matrix(runif(nitems*large_k, 0, 0.2), nitems, large_k),
@@ -57,7 +57,7 @@ toc()
 par(mfrow=c(1,2), mar=c(2, 2, 2, 2))
 plot(small_data_probit$alphas, digits=1, main= "True Loading", text.cell=list(cex=0.6), key=NULL) 
 plot(px_em$lambda0_50$alphas, digits=1, main= "Estimated Loading",  text.cell=list(cex=0.6), key=NULL) 
-saveRDS(px_em, file.path(arguments[["model_output_dir"]], "px_em.rds"))
+#saveRDS(px_em, file.path(arguments[["model_output_dir"]], "px_em.rds"))
 
 # # EM
 tic()

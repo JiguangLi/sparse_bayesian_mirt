@@ -26,7 +26,7 @@ class MCMC_MIRT:
                       responses should be coded as positive integers. Shape: (n, m)
                 dim: number of factors
                 num_samples: num of MCMC draws
-                alpha_prior: normal, or spike-and-slab normal prior
+                alpha_prior: 'normal', or 'ss' (spike-and-slab normal prior), or 'adaptive-ss'
                 loading_constraints: dictionary fixing (j,k) entry of the loading matrix
                 start: start values for thetas, intercepts, and alphas. Must be a dictionary
                 auto_zero_out: whether to force loadings to be zero during sampling
@@ -250,7 +250,6 @@ class MCMC_MIRT:
 
             Note: We assume the program sample intercepts before sampling alphas.
         """
-        ##TODO: ss_theta is currently conditional on unconstrained loadings
         for j in range(self.m):
             for k in range(self.k):
                 if (j, k) not in self.loading_constraints:
@@ -501,11 +500,6 @@ class MCMC_MIRT:
             mu_result = (var_result*new_mu + new_var*mu_result)/denominator
             var_result = (var_result*new_var) / denominator
         return mu_result, var_result
-
-
-
-
-
 
 
 

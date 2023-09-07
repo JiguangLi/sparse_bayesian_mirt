@@ -8,10 +8,10 @@ initialize_alphas <- function(m, k, loading_constraints, start){
       if(has.key("alphas",start)){
         alphas <- start[["alphas"]]
       }else{
-        alphas <- MASS::mvrnorm(n=m, mu = rep(0, k), Sigma = diag(k)) 
+        alphas <- matrix(runif(m*k, 0, 0.02), m, k)
       }
   }else{
-      alphas <- MASS::mvrnorm(n=m, mu = rep(0, k), Sigma = diag(k)) 
+        alphas <- matrix(runif(m*k, 0, 0.02), m, k)
   }
   if(is.null(loading_constraints)==FALSE){
     for(i in 1:nrow(loading_constraints)){
@@ -60,7 +60,7 @@ initialize_intercepts <-function(m, start){
       return(start[["intercepts"]])
     }
   }
-  return(rnorm(m, 0, 1))
+  return(runif(m , -0.2,0.2))
   
 }
 
@@ -99,13 +99,8 @@ sample_thetas <- function(data, params){
   m <- params[["m"]]
   k <- params[["k"]]
   mc_samples <-params[["mc_samples"]]
-  # (n*m) * k matrix
   d1_array <- sweep((rep(1, n) %x% params[["alphas"]]), 1, c(t(2*data-1)), "*")
-  # n by m matrix
   d2_array <- sweep(2*data-1, 2, params[["intercepts"]], "*")
-  # n by m matrix
-  #s_array <- (rowSums(d1_array^2)+1)^0.5 %>% matrix(nrow=n, byrow=TRUE)
-  # 1 by m array
   s_array <- (rowSums(params[["alphas"]]^2)+1)^0.5
   thetas <- 1:n %>% 
     future_map(function(.x) sample_single_thetas(m, k, mc_samples, d1_array[((.x-1)*m+1):(.x*m), ], d2_array[.x, ], s_array), .options = furrr_options(seed = TRUE)) %>% 
@@ -296,7 +291,6 @@ loglikhood <-function(data, param0s, normalize=TRUE){
 
 
 
-
 plot_loading_mat<-function(x, iter_idx, rotate){
   
   title <- paste0("iteartion ", iter_idx, ":  ", rotate, " rotation, abs(loadings)" )
@@ -319,17 +313,22 @@ plot_rotation_mat<-function(x, iter_idx){
 # Args:
 #   data: n by m item response
 #   k: trunctaed dimension for the IBP prior
+#   ibp_alpha: IBP intensity parameter
 #   mc_samples: number of monte-carlo sampls to approximate E step
 #   ssl_lambda0, ssl_lambda1: controlling the variance for SSL prior
 #   max_iterations: maximum iterations allowed
-#.  epsilon: stopping threshold 
+#   epsilon: stopping threshold 
 #   PX: parameter Expansion
+#   varimax: whether performing varimax
 #   Loading_constraints: 3-column matrix, first two columns are positions, last column is value
-#   start: parameter initialization
+#   start: parameter initialization, use hash object
+#   plot: whether to plot loading matrix after each iteration, useful for experimentation
 #   stop_rotation: switch from PX-EM to EM after "stop_rotation" iterations
+#   random_state: set seed
+#   cores: number of cores for parallelization
 
 probit_em_mirt <- function(data, k, ibp_alpha, mc_samples, ssl_lambda0, 
-                           ssl_lambda1, max_iterations, epsilon, PX = FALSE, 
+                           ssl_lambda1, max_iterations, epsilon, PX = TRUE, 
                            varimax = FALSE, loading_constraints= NULL, 
                            start = NULL, plot=FALSE, stop_rotation=100, random_state = 1,
                            cores=8){
@@ -365,7 +364,6 @@ probit_em_mirt <- function(data, k, ibp_alpha, mc_samples, ssl_lambda0,
           }
         }
         
-        
         # varimax step
         if(varimax==TRUE & i %% 5 ==0){
           new_alphas <-varimax(params[["alphas"]]+0.0000001)$loadings
@@ -378,9 +376,6 @@ probit_em_mirt <- function(data, k, ibp_alpha, mc_samples, ssl_lambda0,
           
           plot_loading_mat(abs(params[["alphas"]]), i, "varimax")
         }
-        
-        # max_diff <- max(max(abs(params[["alphas"]] - params[["alphas_prev"]])),
-        #                max(abs(params[["intercepts"]] - params[["intercepts_prev"]])))
         max_diff <- max(abs(params[["alphas"]] - params[["alphas_prev"]]))
         # loglik <- loglikhood(data, params)
         # print (c(i, max_diff, loglik))
@@ -388,7 +383,6 @@ probit_em_mirt <- function(data, k, ibp_alpha, mc_samples, ssl_lambda0,
         if(max_diff < epsilon){
           break
         }
-        
         params[["alphas_prev"]] = params[["alphas"]]
         params[["intercepts_prev"]] = params[["intercepts"]]
 
@@ -404,7 +398,10 @@ probit_em_mirt <- function(data, k, ibp_alpha, mc_samples, ssl_lambda0,
 
 
 ## Dynamic Posterior Exploration
-
+# Args:
+#     same argument meaning as probit_em_mirt
+#     ssl_lambda0_path: a vector of ssl_lambda0 values for dynamic posterior exploration
+#     pos_init: whether to zero out negative loading estimations after each ssl_lambda0 value. For MIRT model, this should be True.
 dynamic_posterior_exploration <- function(data, k, ibp_alpha, mc_samples, ssl_lambda0_path, 
                            ssl_lambda1, pos_init =TRUE, max_iterations, epsilon, PX = FALSE, 
                            varimax = FALSE, loading_constraints= NULL, 
@@ -423,7 +420,6 @@ dynamic_posterior_exploration <- function(data, k, ibp_alpha, mc_samples, ssl_la
   for(i in 2:length(ssl_lambda0_path)){
     if(pos_init == TRUE){
       new_start = hash("alphas"= pmax(models[[i-1]][["alphas"]], 0), "intercepts" = models[[i-1]][["intercepts"]], "c_params"= models[[i-1]][["c_params"]])
-      #new_start = hash("alphas"= abs(models[[i-1]][["alphas"]]), "intercepts" = models[[i-1]][["intercepts"]], "c_params"= models[[i-1]][["c_params"]])
     }else{
       new_start = hash("alphas"= models[[i-1]][["alphas"]], "intercepts" = models[[i-1]][["intercepts"]], "c_params"= models[[i-1]][["c_params"]])
     }

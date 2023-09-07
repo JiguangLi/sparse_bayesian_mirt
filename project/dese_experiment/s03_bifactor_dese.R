@@ -16,7 +16,7 @@ arguments <- arg_parser("FIT DESE data in 2022") %>%
   add_argument(
     "--grades", 
     help= "grades_considered", 
-    default= c("03", "04", "05", "06", "07", "08", "10")
+    default= c("10")
   ) %>%
   add_argument(
     "--year", 

@@ -1,7 +1,7 @@
 library(pacman)
 p_load("tidyverse", "argparser", "feather",  "yaml", "here", "hash" , "parallel", "dplyr")
 
-
+# Make Probablistic Predictions of Item Response Data after Estimation
 em_probit_predict <-function(data, params){
   m <-params[["mc_samples"]]
   predict_all <- pnorm(t(params[["alphas"]] %*% t(params[["thetas"]]) + params[["intercepts"]]))
@@ -9,7 +9,7 @@ em_probit_predict <-function(data, params){
   return(avg_pred)
 }
 
-
+# Compute log likelihood
 loglikhood <-function(data, params){
   m <-params[["mc_samples"]]
   linear_term <- t(params[["alphas"]] %*% t(params[["thetas"]]) + params[["intercepts"]])
@@ -18,7 +18,7 @@ loglikhood <-function(data, params){
   return(result)
 }
 
-
+# Evaluate Probit Models to compute predictions, prediction MSE, mean absolute error, logliklihood
 em_probit_eval <-function(data, params){
   pred <- em_probit_predict(data,params)
   mse <- mean((data-pred)^2)
@@ -28,8 +28,7 @@ em_probit_eval <-function(data, params){
   return(result)
 }
 
-
-# assuming k<= truc_lev
+# Output lower triangularized loading constraints for identification purpose
 lower_trig_loading <- function(k, trunc_lev){
   if(k==trunc_lev){
     num_constraints <- (k+1)*k/2
@@ -55,9 +54,9 @@ lower_trig_loading <- function(k, trunc_lev){
 }
   
   
-# generate overlap data to replicate FBFA paper
+# generate overlap data (Section 2 of the Paper)
 # Args:
-#  n: number of students
+#  n: number of observations
 #  k: true dimension
 #  item_per_dim: how many items per k
 #  overlap: how many items are overlapping between dimension k and k+1
@@ -96,7 +95,7 @@ generate_overlap_data <- function(n, k, items_per_dim, overlap, alpha_threshold=
 
 # generate Bifactor Data
 # Args:
-#  n: number of students
+#  n: number of observations
 #  k: num of dimensions including primart factor
 #  item_per_dim: how many items per k
 #  loading_prior is boolean or generated from normal
@@ -151,7 +150,7 @@ generate_logistic_data <- function(n, loading_matrix, intercepts){
   return(response)
 }
 
-# Generate data with IBP loading
+# Generate data with IBP loading (Section 6.2 of the paper)
 generate_ibp_data <- function(n, num_items, dim, ibp_alpha, seed=1){
   set.seed(seed)
   v_s <- rbeta(dim, ibp_alpha, 1, ncp = 0)
@@ -196,7 +195,6 @@ approximate_bifactor_loadings <- function(true_loading){
   return(result_vec)
 }
 
-# Reorder Columns of Estimated Loading to Match the Truth based on MSE
 # Reorder Columns of Estimated Loading to Match the Truth based on MSE. We also allow switching the sign for the ENTIRE latent dimension.
 reorder_est_loadings <- function(ref_mat, est_mat){
   num_items <- dim(ref_mat)[1]

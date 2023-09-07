@@ -56,9 +56,7 @@ if __name__ == "__main__":
     data_filename = "grade_" + arguments["grade"] + "_sampled.feather"
     data = pd.read_feather(data_input_dir.joinpath(data_filename))
     model_output_dir = pathlib.Path.home().joinpath(pathlib.Path("IBP_IRT", "models", "dese", "2022", "gibbs"))
-    print(data.shape)
     item_names = [col for col in data.columns if "mitem" in col or "eitem" in col]
-    print(item_names)
     large_k = 10
     burn_in = 500
     loading_constraints_large = bmirt.util.lower_trig_constraints(len(item_names), large_k)

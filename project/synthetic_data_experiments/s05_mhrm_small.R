@@ -42,20 +42,3 @@ arrow::write_feather(loadings%>% as.data.frame(), file.path(arguments[["model_ou
 
 
 
-# misspecified model
-# tic()
-# model_mis <- mirt(data, large_k, itemtype = "2PL",  method='MHRM', SE=TRUE ,NCYCLES=2000)
-# toc()
-# # save results
-# saveRDS(model_mis, file.path(arguments[["model_output_dir"]], "mhrm_misspecified.rds"))
-# factor_coefs <- coef(model_mis)
-# loadings <- matrix(0, num_items, large_k+1)
-# for(j in 1:num_items){
-#   loadings[j, ] <- factor_coefs[[j]][1, 1:(large_k+1)]
-# }
-# colnames(loadings) <- c(paste0("dim",1:large_k), "intercepts")
-# arrow::write_feather(loadings%>% as.data.frame(), file.path(arguments[["model_output_dir"]], "mhrm_misspecified_loading.feather"))
-# 
-# 
-
-
