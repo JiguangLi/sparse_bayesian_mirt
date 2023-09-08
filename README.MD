@@ -211,7 +211,7 @@ els using p ́olya–gamma latent variables. Journal of the American Statistical
 Dulal K. Bhaumik, David J. Kupfer, Ellen Frank, Victoria J. Grochocinski, and Angela
 Stover. Full-information item bifactor analysis of graded response data. Applied Psycho-
 logical Measurement, 31(1):4–19, 2007.
-* Veronika Rockov a and Edward I. George. Fast bayesian factor analysis via automatic
+* Veronika Rockova a and Edward I. George. Fast bayesian factor analysis via automatic
 rotations to sparsity. Journal of the American Statistical Association, 111(516):1608–1622,
 2016
 * Veronika Rockova. Bayesian estimation of sparse signals with a continuous spike-and-slab
