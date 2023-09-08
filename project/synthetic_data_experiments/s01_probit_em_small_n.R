@@ -57,7 +57,7 @@ toc()
 par(mfrow=c(1,2), mar=c(2, 2, 2, 2))
 plot(small_data_probit$alphas, digits=1, main= "True Loading", text.cell=list(cex=0.6), key=NULL) 
 plot(px_em$lambda0_50$alphas, digits=1, main= "Estimated Loading",  text.cell=list(cex=0.6), key=NULL) 
-#saveRDS(px_em, file.path(arguments[["model_output_dir"]], "px_em.rds"))
+saveRDS(px_em, file.path(arguments[["model_output_dir"]], "px_em.rds"))
 
 # # EM
 tic()
