@@ -85,23 +85,6 @@ data <- data.frame(cleaned_lines, stringsAsFactors = FALSE)
 data <- data %>%
   tidyr::separate(col = cleaned_lines, into = paste0("col", 1:35), sep = 1:34, convert = TRUE)
 binary_response <- +(data > arguments[["dicho_threshold"]]) %>% as.matrix() %>% unname()
-=======
-This repo contains the R implementation of the PXL-EM algorithm to estimate sparse factor loadings from binary item response data, as illustrated in our paper *Sparse Bayesian Multidimensional Item Response Theory*. While we advocate for the Bayesian EM approach, we also publicize our Python implementation of sparse Gibbs sampler with adaptive spike-and-slab prior for interested researchers.
-
-# Repo Directions
-
-# PXL-EM Usage Examples & Advice
-
-# Sparse Gibbs Sampler Usage Examples & Advice
-
-# Experiment Replications
-
-## IBP Experiment
-
-## DESE Experiment
-
-## QOL Experiment
-
 ```
 Once we transform the raw QOL data to the binary response data, we will be ready to fit our PXL-EM algorithm. Here:
 * ```lambda1```: $\lambda_1$ parameter for the SSL prior. It's usually easier for EM to convergence by specifying a smaller value.
