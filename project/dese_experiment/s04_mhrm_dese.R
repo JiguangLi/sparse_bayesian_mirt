@@ -50,11 +50,10 @@ toc()
 saveRDS(model, file.path(arguments[["model_output_dir"]], "mhrm_grade10.rds"))
 factor_coefs <- coef(model)
 num_items <- dim(ir_grade10)[2]
-loadings <- matrix(0, num_items, 11)
+alphas_params <- matrix(0, num_items, 11)
 for(j in 1:num_items){
-  loadings[j, ] <- factor_coefs[[j]][1, 1:11]
+  alphas_params[j, ] <- factor_coefs[[j]][1, 1:11]
 }
-colnames(loadings) <- c(paste0("dim",1:10), "intercepts")
-arrow::write_feather(loadings%>% as.data.frame(), file.path(arguments[["model_output_dir"]], "mhrm_grade10_loading.feather"))
-
+colnames(alphas_params) <- c(paste0("dim",1:10), "intercepts")
+arrow::write_feather(alphas_params%>% as.data.frame(), file.path(arguments[["model_output_dir"]], "mhrm_grade10_alphas.feather"))
 

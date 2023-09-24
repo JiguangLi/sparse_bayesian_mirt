@@ -39,15 +39,11 @@ toc()
 saveRDS(model, file.path(arguments[["model_output_dir"]], "bifactor.rds"))
 factor_coefs <- coef(model)
 num_items <- dim(binary_response)[2]
-loadings <- matrix(0, num_items, 11)
+alphas_params <- matrix(0, num_items, 10)
 for(j in 1:num_items){
-  loadings[j, ] <- factor_coefs[[j]][1, 1:11]
+  alphas_params[j, ] <- factor_coefs[[j]][1, 1:10]
 }
-colnames(loadings) <- c(paste0("dim",1:10), "intercepts")
-arrow::write_feather(loadings%>% as.data.frame(), file.path(arguments[["model_output_dir"]], "bifactor_loading.feather"))
-
-
-
-
-
-
+colnames(alphas_params) <- c(paste0("dim",1:9), "intercepts")
+arrow::write_feather(alphas_params%>% as.data.frame(), file.path(arguments[["model_output_dir"]], "bifactor_alphas.feather"))
+loading_summary <- summary(model)
+arrow::write_feather(loading_summary$rotF%>% as.data.frame(), file.path(arguments[["model_output_dir"]], "bifactor_loadings.feather"))
