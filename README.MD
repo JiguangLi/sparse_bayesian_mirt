@@ -194,12 +194,42 @@ probit_em_mirt <- function(data,
 
 While we advocate for our PXL-EM algorithm for estimating sparse MIRT models, if you are interested in our implementation of the Sparse Gibbs Sampler, you can find our it in ```project/src/mcmc_sampler/mcmc_mirt.py```, which is well documented. This efficient gibbs sampler utilizes Polya-Gamma augmentation (Polson, Scott, and Windle, 2013) and the adaptive spike-and-slab prior of Ishwaran and Rao, 2015. It was used as a strong baseline model in our paper and you can find more details and its derivations in the Appendix of our paper. 
 
+Here is the main function to create a sparse Gibbs sampler object:
+```python
+class MCMC_MIRT:
+    def __init__(
+            self,
+            data: typing.Union[np.ndarray, pd.DataFrame],
+            dim: int,
+            num_samples: int,
+            alpha_prior: str = "normal",
+            loading_constraints: typing.Dict[typing.Tuple[int, int], float] = {},
+            start: typing.Dict[str, np.ndarray] = {},
+            random_state: int = 42,
+            auto_zero_out: bool = False
+    ):
+
+```
+- ```data```: can be a pandas dataframe or a numpy array. Must be binary data.
+- ```dim:``` latent dimensionality.
+- ```num_samples:``` number of MCMC draws. 
+- ```alpha_prior```: the prior for the loading matrix alpha. Default is "normal" without sparsity assumption.  The other two options are "ss" (spike-and-slab prior of George and McCulloch, 1993), and "adaptive-ss" (adaptive spike-and-slab prior of Ishwaran and Rao, 2005). We used "adative-ss" for our paper as the benchmark.
+- ```Loading_constraints```: see type hints for required data structure. This is helpful if you want to keep certain elements of the loading matrix fixed: for instance, if you want the element in the second row and the third column fixed as 1, you can specify ```loading_constraints= {"(2, 3)" = 1}```.
+- ```start```: You have the option to specify the starting points for ```thetas```(latent factors), ```alphas```(loading matrix), and ```intercepts```. See type hints for required data structure. 
+- ```random_state```
+- ```auto_zero_out```: we had this idea to zero out very small values of the loading matrix along the sampling process. No good theory or empirical success found so far. So we recommend to keep it as ```False```.
+
+For more examples to fit a gibbs sampler, you may checkout the script ```project/qol_experiment/s02_gibbs_qol.py```, in which we fit a sparse "adaptive-ss" Gibbs sampler using the QOL data.
+
+
 # Reference
 
 * Chuanhai Liu, Donald B. Rubin, and Ying Nian Wu. Parameter expansion to accelerate
 em: The px-em algorithm. Biometrika, 85(4):755–770, 1998.
 * Daniele Durante. Conjugate bayes for probit regression via unified skew-normal distribu-
 tions. Biometrika, 106(4):765–779, aug 2019.
+* Edward I. George and Robert E. McCulloch. Variable selection via gibbs sampling. Journal
+of the American Statistical Association, 88(423):881–889, 1993.
 * Hemant Ishwaran and J. Sunil Rao. Spike and slab variable selection: Frequentist and
 Bayesian strategies. The Annals of Statistics, 33(2):730 – 773, 2005.
 * Li Cai. High-dimensional Exploratory Item Factor Analysis by A Metropolis–Hastings
