@@ -39,16 +39,24 @@ nitems <- 35
 set.seed(1)
 loading_starts_large <- hash("alphas"= matrix(runif(nitems*large_k, 0, 0.1), nitems, large_k),
                              "intercepts"= runif(nitems , -0.1,0.1), "c_params" = rep(0.5, large_k))
+
 tic()
 px_em <- dynamic_posterior_exploration(data =binary_response, k = large_k, ibp_alpha = 2, mc_samples =50,
-                                       ssl_lambda0_path = lambda0_path, ssl_lambda1 = lambda1, pos_init =TRUE,
+                                       ssl_lambda0_path = lambda0_path, ssl_lambda1 = lambda1, pos_init =FALSE,
                                        max_iterations= 100, epsilon = 0.04, PX = TRUE, varimax = FALSE,
                                        loading_constraints= NULL, start = loading_starts_large,
                                        plot=FALSE, stop_rotation=100, random_state = 1, cores=8)
 toc()
+
+# note when you plot the alpha matrix, dimension 7 and 9 would be entirely negatives. 
 par(mfrow=c(1,1), mar=c(2, 2, 2, 2))
 plot(px_em$lambda0_40$alphas, digits=1, main= "Estimated Loading",  text.cell=list(cex=0.6), key=NULL) 
-saveRDS(px_em, file.path(arguments[["model_output_dir"]], "px_em.rds"))
+
+# Since FA are invariaint againt signs we can flip the signs of dimensions 7 and 9 for better visualizations
+temp <- abs(px_em$lambda0_40$alphas)
+par(mfrow=c(1,1), mar=c(2, 2, 2, 2))
+plot(temp, digits=1, main= "Estimated Loading",  text.cell=list(cex=0.6), key=NULL) 
+#saveRDS(px_em, file.path(arguments[["model_output_dir"]], "px_em.rds"))
 
 
 
