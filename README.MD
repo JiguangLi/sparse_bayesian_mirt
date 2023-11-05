@@ -1,6 +1,6 @@
 # Sparse Bayesian Multidimensional Item Response Theory
 
-This repo contains the official R implementation of the PXL-EM algorithm to estimate sparse factor loadings from binary item response data, as illustrated in our paper *Sparse Bayesian Multidimensional Item Response Theory*. While we advocate for this Bayesian EM approach, we also publicize our Python implementation of the sparse Gibbs sampler (with Polya-Gamma Augmentation) for interested researchers.
+This repo contains the official R implementation of the PXL-EM algorithm to estimate sparse factor loadings from binary item response data, as illustrated in our paper *Sparse Bayesian Multidimensional Item Response Theory*: (https://arxiv.org/pdf/2310.17820.pdf). While we advocate for this Bayesian EM approach, we also publicize our Python implementation of the sparse Gibbs sampler (with Polya-Gamma Augmentation) for interested researchers.
 
 In addition, we include relevant codes that can replicate every experiment described in our paper.
 
